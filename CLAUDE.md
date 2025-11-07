@@ -20,3 +20,10 @@ This section will be populated as build, test, and development commands are esta
 - Repository is on `main` branch
 - No commits yet - this is a fresh repository
 - Development practices and architecture will be documented here as they are established
+
+## Active Technologies
+- Shell scripting (Bash/Zsh) for orchestration, Dockerfile for image definition + OrbStack for containerization (chosen for macOS performance and native Apple Silicon support) (001-isolated-dev-env)
+- Container volumes for isolated filesystem, bind mounts for host code access (001-isolated-dev-env)
+
+## Recent Changes
+- 001-isolated-dev-env: Added Shell scripting (Bash/Zsh) for orchestration, Dockerfile for image definition + OrbStack for containerization (chosen for macOS performance and native Apple Silicon support)
