@@ -1,5 +1,10 @@
 # Isolated Development Environment
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Shell Script](https://img.shields.io/badge/Shell-Bash-4EAA25?logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Tests](https://img.shields.io/badge/Tests-40%20passing-success)](tests/)
+
 Create safe, isolated development environments for running Claude Code with relaxed permissions, pre-configured with NodeJS and Python.
 
 ## Overview
@@ -270,8 +275,17 @@ This project follows Test-Driven Development (TDD):
 
 ## License
 
-[Your License Here]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2025 Ovidiu Eftimie
 
 ## Contributing
 
-[Contributing guidelines here]
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
+- Development setup
+- Testing requirements
+- Commit conventions
+- Pull request process
+- Code style guidelines
+
+For bugs and feature requests, please open an issue on GitHub.
