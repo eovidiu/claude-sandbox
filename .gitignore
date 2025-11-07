@@ -1,0 +1,25 @@
+# Environment variables (secrets)
+.env
+.env.*
+!.env.template
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.tmp
+
+# Logs
+*.log
+
+# Test outputs
+test-results/
+*.tap
+
+# Temporary files
+tmp/
+*.bak
