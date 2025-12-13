@@ -1,4 +1,4 @@
-# Isolated Development Environment
+# Claude Sandbox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Build](https://github.com/eovidiu/claude-sandbox/actions/workflows/publish-docker-image.yml/badge.svg)](https://github.com/eovidiu/claude-sandbox/actions/workflows/publish-docker-image.yml)
@@ -6,372 +6,581 @@
 [![Docker](https://img.shields.io/badge/Docker-Required-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Tests](https://img.shields.io/badge/Tests-40%20passing-success)](tests/)
 
-Create safe, isolated development environments for running Claude Code with relaxed permissions, pre-configured with NodeJS and Python.
+**Run Claude Code with `--dangerously-skip-permissions` safely in an isolated container.**
 
-## Overview
+Pre-configured with Node.js LTS (v20.x) and Python 3.11+ for full-stack development.
 
-This project provides scripts and configuration to spin up isolated containerized development environments on macOS. The primary use case is running Claude Code with `--dangerously-skip-permissions` safely without affecting your host system.
+---
 
-## Features
+## Why Use This?
 
-- ✅ **Isolated Environment**: Complete isolation from host macOS system
-- ✅ **Pre-configured Runtimes**: NodeJS LTS and Python 3.11+ pre-installed
-- ✅ **Claude Code Ready**: Easy npm-based installation script included
-- ✅ **Secret Management**: Inject secrets at startup without disk persistence
-- ✅ **Simple Commands**: Single-command spin-up and tear-down
-- ✅ **Fast**: ~4 second spin-up (with cached image), 30 second tear-down
+When you run Claude Code with `--dangerously-skip-permissions`, it can execute any command on your system. This sandbox provides:
 
-## Prerequisites
+- **Complete isolation** - Claude can't touch your host filesystem, only mounted directories
+- **Safe experimentation** - Let Claude install packages, modify files, run scripts freely
+- **Pre-configured runtimes** - Node.js, npm, yarn, Python, pip, virtualenv ready to go
+- **Secret injection** - Pass API keys at runtime without persisting to disk
+- **Fast iteration** - ~4s spin-up, 30s tear-down
 
-- **macOS** (Intel or Apple Silicon)
-- **OrbStack** (recommended) or Docker Desktop
-  ```bash
-  brew install orbstack
-  ```
-- **bats-core** (for running tests)
-  ```bash
-  brew install bats-core bats-support bats-assert bats-file
-  ```
+---
 
-## Quick Start
+## Recommended Setup (One-Time)
 
-### Option 1: Using Pre-built Docker Image (Fastest)
+Add a `sandbox` command to your shell for instant access from any project.
 
-Pull the pre-built image from GitHub Container Registry:
+### Step 1: Add to ~/.zshrc (or ~/.bashrc)
 
 ```bash
-# Pull the latest image
+nano ~/.zshrc
+```
+
+Add this at the end:
+
+```bash
+# =============================================================================
+# Claude Sandbox - Isolated development environment for Claude Code
+# Usage: cd into any project directory and run 'sandbox'
+# =============================================================================
+
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+sandbox() {
+    local project_name=$(basename "$(pwd)" | tr '.' '-')
+    local container="sandbox-${project_name}"
+
+    # Create if doesn't exist
+    if ! docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
+        echo "Creating sandbox for ${project_name}..."
+        docker run -d --name "$container" \
+            -v "$(pwd):/workspace:rw" \
+            -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+            -p 3000:3000 -p 8000:8000 \
+            ghcr.io/eovidiu/claude-sandbox:latest \
+            tail -f /dev/null
+
+        echo "Installing Claude Code (one-time)..."
+        docker exec "$container" install-claude.sh
+        echo "Done. Claude is ready."
+    fi
+
+    # Start if stopped
+    docker start "$container" 2>/dev/null
+
+    # Enter the sandbox
+    docker exec -it -w /workspace "$container" bash
+}
+
+# Cleanup helper: sandbox-rm [project-name]
+sandbox-rm() {
+    local container="sandbox-${1:-$(basename "$(pwd)" | tr '.' '-')}"
+    docker rm -f "$container" 2>/dev/null && echo "Removed $container" || echo "Container $container not found"
+}
+
+# List all sandboxes
+sandbox-ls() {
+    docker ps -a --filter "name=sandbox-" --format "table {{.Names}}\t{{.Status}}\t{{.Size}}"
+}
+```
+
+### Step 2: Reload shell
+
+```bash
+source ~/.zshrc
+```
+
+### Step 3: Pull the image (optional, happens automatically)
+
+```bash
 docker pull ghcr.io/eovidiu/claude-sandbox:latest
+```
 
-# Or pull a specific version
-docker pull ghcr.io/eovidiu/claude-sandbox:v1.0.0
+---
 
-# Run the container
+## Daily Workflow
+
+```bash
+cd ~/work/any-project
+sandbox
+# You're in. Claude is ready. Run:
+claude --dangerously-skip-permissions
+```
+
+**First time per project**: ~30 seconds (installs Claude Code)
+**Every time after**: Instant
+
+---
+
+## Shell Commands Reference
+
+| Command | What it does |
+|---------|--------------|
+| `sandbox` | Enter sandbox for current directory |
+| `sandbox-ls` | List all sandbox containers |
+| `sandbox-rm` | Remove sandbox for current directory |
+| `sandbox-rm project-name` | Remove a specific sandbox |
+
+---
+
+## Alternative: Direct Docker (No Setup)
+
+If you don't want to modify your shell config:
+
+```bash
+# Run with your project mounted (Claude needs installing each time)
 docker run -it --rm \
-  -v ~/work/ai:/workspace:rw \
+  -v ~/your-project:/workspace:rw \
+  -e ANTHROPIC_API_KEY=your-key \
+  ghcr.io/eovidiu/claude-sandbox:latest
+
+# Inside container
+install-claude.sh --verify
+claude --dangerously-skip-permissions
+```
+
+---
+
+## Alternative: Clone Repository (Advanced)
+
+For additional features like configuration files and helper scripts:
+
+```bash
+git clone https://github.com/eovidiu/claude-sandbox.git
+cd claude-sandbox
+
+# Configure your workspace
+cp config/.env.template config/.env
+# Edit config/.env to set HOST_MOUNTS to your project directory
+
+# Start environment
+./scripts/dev-env-up.sh --secret ANTHROPIC_API_KEY=your-key
+```
+
+---
+
+## Common Use Cases
+
+### Use Case 1: Let Claude Code Build Your Project
+
+Mount your project and give Claude full access to modify, test, and build:
+
+```bash
+docker run -it --rm \
+  -v ~/my-app:/workspace:rw \
+  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  -p 3000:3000 \
+  ghcr.io/eovidiu/claude-sandbox:latest
+
+# Inside container
+install-claude.sh --verify
+cd /workspace
+claude --dangerously-skip-permissions
+# Ask Claude: "Set up this project and run the dev server"
+```
+
+### Use Case 2: Isolated Package Experimentation
+
+Let Claude install any npm/pip packages without affecting your host:
+
+```bash
+docker run -it --rm \
+  -v ~/experiments:/workspace:rw \
+  ghcr.io/eovidiu/claude-sandbox:latest
+
+# Inside container
+npm install -g typescript ts-node
+pip install pandas numpy matplotlib
+# Nothing installed on your host system
+```
+
+### Use Case 3: Multi-Project Development
+
+Run multiple isolated environments simultaneously:
+
+```bash
+# Terminal 1: Frontend project
+docker run -it --rm --name frontend \
+  -v ~/frontend:/workspace:rw \
+  -p 3000:3000 \
+  ghcr.io/eovidiu/claude-sandbox:latest
+
+# Terminal 2: Backend project
+docker run -it --rm --name backend \
+  -v ~/backend:/workspace:rw \
+  -p 8000:8000 \
   ghcr.io/eovidiu/claude-sandbox:latest
 ```
 
-### Option 2: Build from Source
+### Use Case 4: CI/CD Testing Locally
 
-### 1. Configure Your Environment
+Test your CI pipeline commands in the same environment:
 
 ```bash
-# Copy the template
-cp config/.env.template config/.env
-
-# Edit config/.env to set your project directory mount path
-# Example: HOST_MOUNTS=/Users/yourname/projects:/workspace:rw
-nano config/.env
+docker run --rm \
+  -v ~/project:/workspace:rw \
+  ghcr.io/eovidiu/claude-sandbox:latest \
+  bash -c "npm ci && npm test && npm run build"
 ```
 
-### 2. Start Your Environment
+---
+
+## Command Cheatsheet
+
+### Shell Commands (after setup)
+
+| Command | What it does |
+|---------|--------------|
+| `sandbox` | Enter sandbox for current project |
+| `sandbox-ls` | List all sandbox containers |
+| `sandbox-rm` | Remove current project's sandbox |
+| `sandbox-rm name` | Remove specific sandbox |
+
+### Inside Container
+
+| Command | What it does |
+|---------|--------------|
+| `claude --dangerously-skip-permissions` | Run Claude with full permissions |
+| `verify-runtimes.sh` | Check Node.js and Python setup |
+| `exit` | Leave the sandbox |
+
+### Direct Docker (without shell setup)
+
+| Task | Command |
+|------|---------|
+| **Interactive shell** | `docker run -it --rm -v ~/project:/workspace:rw ghcr.io/eovidiu/claude-sandbox:latest` |
+| **Run single command** | `docker run --rm -v ~/project:/workspace:rw ghcr.io/eovidiu/claude-sandbox:latest node -v` |
+| **With API key** | `docker run -it --rm -v ~/project:/workspace:rw -e ANTHROPIC_API_KEY=sk-xxx ghcr.io/eovidiu/claude-sandbox:latest` |
+| **With ports** | `docker run -it --rm -v ~/project:/workspace:rw -p 3000:3000 ghcr.io/eovidiu/claude-sandbox:latest` |
+
+---
+
+## Using Helper Scripts
+
+If you cloned the repository, use the helper scripts for more control:
+
+### Create Environment
 
 ```bash
-# Basic usage
+# Basic
 ./scripts/dev-env-up.sh
 
-# With custom configuration
-./scripts/dev-env-up.sh --config .env
+# With secrets (recommended for API keys)
+./scripts/dev-env-up.sh --secret ANTHROPIC_API_KEY=sk-xxx --secret DB_PASSWORD=secret
 
-# With secrets
-./scripts/dev-env-up.sh --secret API_KEY=abc123 --secret DB_PASSWORD=secret
+# With additional mounts and ports
+./scripts/dev-env-up.sh \
+  --name my-project \
+  --mount ~/data:/data:ro \
+  --port 3000:3000 \
+  --port 8000:8000
 ```
 
-### 3. Access Your Environment
+### Access Environment
 
 ```bash
 # Interactive shell
 ./scripts/dev-env-shell.sh claude-dev
 
-# Run a single command
-./scripts/dev-env-shell.sh claude-dev --command "node --version"
+# Run command
+./scripts/dev-env-shell.sh claude-dev --command "npm test"
+
+# Run as different user
+./scripts/dev-env-shell.sh claude-dev --user root --command "apt update"
 ```
 
-### 4. Stop Your Environment
+### Destroy Environment
 
 ```bash
-# With confirmation
+# With confirmation prompt
 ./scripts/dev-env-down.sh claude-dev
 
-# Force removal without confirmation
+# Force removal
 ./scripts/dev-env-down.sh claude-dev --force
-```
 
-## Detailed Usage
-
-### Creating Environments
-
-**Basic creation:**
-```bash
-./scripts/dev-env-up.sh
-```
-
-**With custom configuration:**
-```bash
-./scripts/dev-env-up.sh --config my-config.env
-```
-
-**With additional mounts:**
-```bash
-./scripts/dev-env-up.sh --mount /host/data:/container/data:ro
-```
-
-**With port mappings:**
-```bash
-./scripts/dev-env-up.sh --port 8080:8080 --port 5432:5432
-```
-
-**With secrets (memory-only, not persisted):**
-```bash
-./scripts/dev-env-up.sh \
-  --secret "API_KEY=sk-1234567890" \
-  --secret "DB_PASSWORD=secure-pass" \
-  --secret "JWT_SECRET=secret-key"
-```
-
-**Combined example:**
-```bash
-./scripts/dev-env-up.sh \
-  --name my-project \
-  --mount ~/projects/my-app:/workspace:rw \
-  --port 3000:3000 \
-  --secret "API_KEY=abc123" \
-  --verbose
-```
-
-### Accessing Environments
-
-**Interactive shell:**
-```bash
-./scripts/dev-env-shell.sh claude-dev
-```
-
-**Execute single command:**
-```bash
-./scripts/dev-env-shell.sh claude-dev --command "node --version"
-```
-
-**Run as different user:**
-```bash
-./scripts/dev-env-shell.sh claude-dev --user root --command "apt-get update"
-```
-
-**Change working directory:**
-```bash
-./scripts/dev-env-shell.sh claude-dev --workdir /tmp --command "pwd"
-```
-
-**NodeJS development:**
-```bash
-# Check versions
-./scripts/dev-env-shell.sh claude-dev --command "node --version"
-./scripts/dev-env-shell.sh claude-dev --command "npm --version"
-./scripts/dev-env-shell.sh claude-dev --command "yarn --version"
-
-# Install packages
-./scripts/dev-env-shell.sh claude-dev --command "npm install express"
-
-# Run your app
-./scripts/dev-env-shell.sh claude-dev --command "node app.js"
-```
-
-**Python development:**
-```bash
-# Check versions
-./scripts/dev-env-shell.sh claude-dev --command "python --version"
-./scripts/dev-env-shell.sh claude-dev --command "pip --version"
-
-# Install packages
-./scripts/dev-env-shell.sh claude-dev --command "pip install requests"
-
-# Create virtual environment
-./scripts/dev-env-shell.sh claude-dev --command "python -m venv venv"
-
-# Use pipenv
-./scripts/dev-env-shell.sh claude-dev --command "pipenv install flask"
-```
-
-**Claude Code usage:**
-```bash
-# Install Claude Code via npm (one-time, inside container)
-./scripts/dev-env-shell.sh claude-dev --command "install-claude.sh --verify"
-
-# Access interactive shell (Claude Code is available in PATH)
-./scripts/dev-env-shell.sh claude-dev
-
-# Inside the container:
-claude --help
-claude --dangerously-skip-permissions
-```
-
-**Note:** Claude Code is installed globally via npm (`@anthropic-ai/claude-code`). The entrypoint automatically makes it available in interactive shells.
-
-### Destroying Environments
-
-**With confirmation prompt:**
-```bash
-./scripts/dev-env-down.sh claude-dev
-```
-
-**Force removal (no prompt):**
-```bash
-./scripts/dev-env-down.sh claude-dev --force
-```
-
-**Keep volumes:**
-```bash
+# Keep volumes
 ./scripts/dev-env-down.sh claude-dev --keep-volumes --force
 ```
 
-### Utility Scripts
-
-**Verify runtimes:**
-```bash
-./scripts/dev-env-shell.sh claude-dev --command "verify-runtimes.sh"
-```
-
-**Install Claude Code:**
-```bash
-./scripts/dev-env-shell.sh claude-dev --command "install-claude.sh --verify"
-```
-
-## Docker Image
-
-### Pre-built Images
-
-Pre-built Docker images are available on GitHub Container Registry:
-
-```bash
-# Pull latest stable version
-docker pull ghcr.io/eovidiu/claude-sandbox:latest
-
-# Pull specific version
-docker pull ghcr.io/eovidiu/claude-sandbox:v1.0.0
-
-# View available tags
-# Visit: https://github.com/eovidiu/claude-sandbox/pkgs/container/claude-sandbox
-```
-
-### Direct Docker Usage
-
-You can use the image directly without the helper scripts:
-
-```bash
-# Interactive shell with mounted workspace
-docker run -it --rm \
-  -v ~/projects:/workspace:rw \
-  ghcr.io/eovidiu/claude-sandbox:latest
-
-# Run a specific command
-docker run --rm \
-  -v ~/projects:/workspace:rw \
-  ghcr.io/eovidiu/claude-sandbox:latest \
-  node --version
-
-# With environment variables (secrets)
-docker run -it --rm \
-  -v ~/projects:/workspace:rw \
-  -e API_KEY=your-secret-key \
-  -e DB_PASSWORD=your-password \
-  ghcr.io/eovidiu/claude-sandbox:latest
-
-# With port mappings
-docker run -it --rm \
-  -v ~/projects:/workspace:rw \
-  -p 3000:3000 \
-  -p 8000:8000 \
-  ghcr.io/eovidiu/claude-sandbox:latest
-```
-
-### Building Locally
-
-```bash
-# Build the image
-docker build -t claude-sandbox:local .
-
-# Run your local build
-docker run -it --rm -v ~/projects:/workspace:rw claude-sandbox:local
-```
-
-### Image Details
-
-- **Base Image**: Ubuntu 22.04 LTS
-- **Size**: ~800MB (optimized with layer caching)
-- **Runtimes**: NodeJS LTS (v20.x), Python 3.11+
-- **Package Managers**: npm, yarn, pip, virtualenv, pipenv
-- **Tools**: git, curl, wget, build-essential
-
-## Scripts Reference
-
-| Script | Purpose | Key Options |
-|--------|---------|-------------|
-| `scripts/dev-env-up.sh` | Create isolated environment | `--config`, `--name`, `--secret`, `--mount`, `--port`, `--verbose` |
-| `scripts/dev-env-down.sh` | Destroy environment | `--force`, `--keep-volumes` |
-| `scripts/dev-env-shell.sh` | Access shell or run commands | `--command`, `--user`, `--workdir` |
-| `scripts/install-claude.sh` | Install Claude Code binary | `--verify`, `--install-dir` |
-| `scripts/verify-runtimes.sh` | Verify NodeJS/Python setup | (run inside container) |
+---
 
 ## Configuration
 
-Configuration file: `config/.env.template`
+### Environment Variables
 
-Key settings:
-- `ENV_NAME`: Container name (default: claude-dev)
-- `HOST_MOUNTS`: Host→Container directory mappings
-- `PORTS`: Port mappings (HOST:CONTAINER)
-- `NODEJS_VERSION`: NodeJS version (default: lts/iron)
-- `PYTHON_VERSION`: Python version (default: 3.11)
-- `ENVIRONMENT_VARS`: Non-secret environment variables
-
-**Never put secrets in config files!** Use `--secret` flag instead.
-
-## Testing
-
-Run tests to verify installation:
+Create `config/.env` from the template:
 
 ```bash
-# Run all tests
-bats tests/
-
-# Run specific test suite
-bats tests/test-env-up.bats
+cp config/.env.template config/.env
 ```
 
-## Architecture
+Key settings:
 
-- **Base Image**: Ubuntu 22.04
-- **Container Runtime**: OrbStack (Docker-compatible)
-- **Runtimes**: NodeJS LTS, Python 3.11+
-- **Testing**: bats-core
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ENV_NAME` | Container name | `claude-dev` |
+| `BASE_IMAGE` | Docker image | `ghcr.io/eovidiu/claude-sandbox:latest` |
+| `HOST_MOUNTS` | Volume mounts (HOST:CONTAINER:MODE) | - |
+| `PORTS` | Port mappings (HOST:CONTAINER) | `3000:3000,8000:8000` |
+| `NODEJS_VERSION` | Node.js version | `lts/*` |
+| `PYTHON_VERSION` | Python version | `3.11` |
 
-## Documentation
+**Security**: Never put secrets in config files. Use `--secret` flag or `-e` with docker run.
 
-- See `specs/001-isolated-dev-env/` for detailed specifications and design documents
-- See `docs/troubleshooting.md` for common issues and solutions
-- All scripts support `--help` flag for detailed usage information
+### Example Configuration
 
-## Development
+```bash
+# config/.env
+ENV_NAME=my-dev-env
+HOST_MOUNTS=/Users/me/projects:/workspace:rw,/Users/me/data:/data:ro
+PORTS=3000:3000,5000:5000,8000:8000
+```
 
-This project follows Test-Driven Development (TDD):
-1. Tests are written first (in `tests/`)
-2. Tests verified to fail
-3. Implementation added to pass tests
-4. Refactor while keeping tests green
+---
+
+## What's Included
+
+### Pre-installed Runtimes
+
+| Runtime | Version | Package Managers |
+|---------|---------|-----------------|
+| Node.js | LTS v20.x (via nvm) | npm, yarn |
+| Python | 3.11+ | pip, virtualenv, pipenv |
+
+### Pre-installed Tools
+
+- git, curl, wget
+- build-essential (for native modules)
+- verify-runtimes.sh (diagnostic script)
+- install-claude.sh (Claude Code installer)
+
+### Container Specs
+
+- **Base**: Ubuntu 22.04 LTS
+- **Size**: ~800MB
+- **Platforms**: linux/amd64, linux/arm64 (Apple Silicon)
+- **User**: Runs as non-root `dev` user (UID 1000) - required for Claude Code
+- **Sudo**: Available for installing system packages when needed
+
+---
+
+## Security Model
+
+### Isolation Guarantees
+
+1. **Filesystem isolation** - Container has its own filesystem; only mounted directories are accessible
+2. **Network isolation** - Only exposed ports are accessible from host
+3. **Process isolation** - Container processes can't see or affect host processes
+4. **Secret handling** - Secrets passed via `-e` or `--secret` exist only in memory
+
+### What Claude CAN Do (Inside Container)
+
+- Read/write any file in mounted directories
+- Install any packages (npm, pip, apt)
+- Execute any command
+- Start services on any port
+- Modify system configuration
+
+### What Claude CANNOT Do
+
+- Access unmounted host directories
+- See or modify host processes
+- Access host network services (except explicitly exposed)
+- Persist data outside mounted volumes (unless configured)
+
+---
+
+## Integration Patterns
+
+### Recommended: Shell Function
+
+After the [Recommended Setup](#recommended-setup-one-time), just use:
+
+```bash
+cd ~/work/any-project
+sandbox
+```
+
+Each project gets its own persistent container with Claude pre-installed.
+
+### Alternative: Docker Compose
+
+If you prefer Docker Compose for your project:
+
+```yaml
+# docker-compose.dev.yml
+services:
+  sandbox:
+    image: ghcr.io/eovidiu/claude-sandbox:latest
+    volumes:
+      - .:/workspace:rw
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    stdin_open: true
+    tty: true
+```
+
+Run with: `docker compose -f docker-compose.dev.yml run sandbox`
+
+### Alternative: Makefile
+
+```makefile
+.PHONY: sandbox
+
+sandbox:
+	docker run -it --rm \
+		-v $(PWD):/workspace:rw \
+		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
+		-p 3000:3000 \
+		ghcr.io/eovidiu/claude-sandbox:latest
+```
+
+Run with: `make sandbox`
+
+---
+
+## Troubleshooting
+
+### Quick Fixes
+
+| Problem | Solution |
+|---------|----------|
+| `sandbox: command not found` | Run `source ~/.zshrc` to reload shell |
+| `claude: command not found` | Run `install-claude.sh --verify` inside container |
+| `node: command not found` | Run `. ~/.nvm/nvm.sh` or re-enter with `sandbox` |
+| Port already in use | Remove sandbox: `sandbox-rm` then re-run `sandbox` |
+| Container name exists | Run `sandbox-rm` to remove it |
+| Permission denied on mount | Check host directory permissions |
+
+### Verify Installation
+
+```bash
+# Inside container
+verify-runtimes.sh         # Check Node.js and Python
+install-claude.sh --verify # Check Claude Code
+```
+
+### Reset a Project's Sandbox
+
+```bash
+sandbox-rm              # Remove current project's sandbox
+sandbox                 # Create fresh sandbox
+```
+
+### Full Reset (All Sandboxes)
+
+```bash
+# Remove all sandbox containers
+docker rm -f $(docker ps -a --filter "name=sandbox-" -q) 2>/dev/null
+
+# Remove and re-pull image
+docker rmi ghcr.io/eovidiu/claude-sandbox:latest
+docker pull ghcr.io/eovidiu/claude-sandbox:latest
+```
+
+For more issues, see [docs/troubleshooting.md](docs/troubleshooting.md).
+
+---
+
+## Building from Source
+
+### Build Locally
+
+```bash
+# Clone repository
+git clone https://github.com/eovidiu/claude-sandbox.git
+cd claude-sandbox
+
+# Build image
+docker build -t claude-sandbox:local .
+
+# Run local build
+docker run -it --rm -v ~/projects:/workspace:rw claude-sandbox:local
+```
+
+### Update Existing Sandboxes After Rebuild
+
+If you rebuild the image, existing sandbox containers still use the old image. To update:
+
+```bash
+# Remove existing sandbox for a project
+cd ~/work/your-project
+sandbox-rm
+
+# Pull new image (if using remote) or rebuild locally
+docker pull ghcr.io/eovidiu/claude-sandbox:latest
+# OR: docker build -t ghcr.io/eovidiu/claude-sandbox:latest .
+
+# Re-enter (creates new container with new image)
+sandbox
+```
+
+### Run Tests
+
+```bash
+brew install bats-core bats-support bats-assert bats-file
+bats tests/
+```
+
+### Push to Registry (Maintainers)
+
+```bash
+# Build multi-platform image
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/eovidiu/claude-sandbox:latest \
+  -t ghcr.io/eovidiu/claude-sandbox:v1.1.0 \
+  --push .
+```
+
+---
+
+## Project Structure
+
+```
+claude-sandbox/
+├── scripts/
+│   ├── dev-env-up.sh      # Create environment
+│   ├── dev-env-down.sh    # Destroy environment
+│   ├── dev-env-shell.sh   # Access shell/run commands
+│   ├── install-claude.sh  # Install Claude Code (in container)
+│   └── verify-runtimes.sh # Verify runtimes (in container)
+├── config/
+│   ├── .env.template      # Configuration template
+│   └── entrypoint.sh      # Container entrypoint
+├── tests/                 # BATS test suite
+├── docs/
+│   └── troubleshooting.md # Troubleshooting guide
+├── Dockerfile             # Container definition
+└── README.md              # This file
+```
+
+---
+
+## Performance
+
+| Operation | Time |
+|-----------|------|
+| First pull | ~2 min (800MB download) |
+| Container start | ~4 seconds |
+| Claude Code install | ~30 seconds |
+| Container stop | ~1 second |
+| Full teardown | ~30 seconds |
+
+**Tip**: Use [OrbStack](https://orbstack.dev) instead of Docker Desktop for faster startup on macOS.
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-Copyright (c) 2025 Ovidiu Eftimie
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
-- Development setup
-- Testing requirements
-- Commit conventions
-- Pull request process
-- Code style guidelines
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-For bugs and feature requests, please open an issue on GitHub.
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/eovidiu/claude-sandbox/issues)
+- **Documentation**: [docs/troubleshooting.md](docs/troubleshooting.md)
+- **Scripts help**: Run any script with `--help` flag
