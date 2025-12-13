@@ -57,17 +57,13 @@ sandbox() {
             -p 3000:3000 -p 8000:8000 \
             ghcr.io/eovidiu/claude-sandbox:latest \
             tail -f /dev/null
-
-        echo "Installing Claude Code (one-time)..."
-        docker exec "$container" install-claude.sh
-        echo "Done. Claude is ready."
     fi
 
     # Start if stopped
     docker start "$container" 2>/dev/null
 
-    # Enter the sandbox
-    docker exec -it -w /workspace "$container" bash
+    # Launch Claude Code directly
+    docker exec -it -w /workspace "$container" claude --dangerously-skip-permissions
 }
 
 # Cleanup helper: sandbox-rm [project-name]
@@ -101,12 +97,11 @@ docker pull ghcr.io/eovidiu/claude-sandbox:latest
 ```bash
 cd ~/work/any-project
 sandbox
-# You're in. Claude is ready. Run:
-claude --dangerously-skip-permissions
+# Claude Code launches automatically with --dangerously-skip-permissions
 ```
 
-**First time per project**: ~30 seconds (installs Claude Code)
-**Every time after**: Instant
+**First time per project**: Container creation (~5 seconds)
+**Every time after**: Instant (Claude launches automatically)
 
 ---
 
@@ -114,7 +109,7 @@ claude --dangerously-skip-permissions
 
 | Command | What it does |
 |---------|--------------|
-| `sandbox` | Enter sandbox for current directory |
+| `sandbox` | Launch Claude Code in sandbox for current directory |
 | `sandbox-ls` | List all sandbox containers |
 | `sandbox-rm` | Remove sandbox for current directory |
 | `sandbox-rm project-name` | Remove a specific sandbox |

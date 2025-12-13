@@ -97,7 +97,13 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | b
     && nvm install $NODE_VERSION \
     && nvm alias default $NODE_VERSION \
     && nvm use default \
-    && npm install -g yarn
+    && npm install -g yarn \
+    && npm install -g @anthropic-ai/claude-code \
+    && npm install -g ccstatusline
+
+# Create Claude Code settings with statusline configuration
+RUN mkdir -p /home/$DEV_USER/.claude \
+    && echo '{"statusLine":{"type":"command","command":"ccstatusline","padding":0}}' > /home/$DEV_USER/.claude/settings.json
 
 # Add nvm initialization to .bashrc for interactive shells
 RUN echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc \
@@ -107,11 +113,13 @@ RUN echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc \
 # Switch back to root for system-wide installations
 USER root
 
-# Create symlinks for node, npm, and yarn to make them available globally
+# Create symlinks for node, npm, yarn, claude, and ccstatusline to make them available globally
 # This ensures tools work without sourcing nvm.sh in non-interactive shells
 RUN ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/node /usr/local/bin/node \
     && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/npm /usr/local/bin/npm \
-    && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/yarn /usr/local/bin/yarn
+    && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/yarn /usr/local/bin/yarn \
+    && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/claude /usr/local/bin/claude \
+    && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/ccstatusline /usr/local/bin/ccstatusline
 
 # Copy runtime verification script (can be run manually inside container)
 COPY scripts/verify-runtimes.sh /usr/local/bin/verify-runtimes.sh
