@@ -37,15 +37,19 @@ build_mcp_config() {
     # Supabase (local MCP server with personal access token)
     # Get your token from: https://supabase.com/dashboard/account/tokens
     if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
-        local supabase_args='["-y", "@supabase/mcp-server-supabase@latest"]'
         if [[ -n "${SUPABASE_PROJECT_REF:-}" ]]; then
-            supabase_args="["-y", \"@supabase/mcp-server-supabase@latest\", \"--project-ref\", \"${SUPABASE_PROJECT_REF}\"]"
+            config=$(echo "$config" | jq --arg token "$SUPABASE_ACCESS_TOKEN" --arg ref "$SUPABASE_PROJECT_REF" '.mcpServers.supabase = {
+                "command": "npx",
+                "args": ["-y", "@supabase/mcp-server-supabase@latest", "--project-ref", $ref],
+                "env": {"SUPABASE_ACCESS_TOKEN": $token}
+            }')
+        else
+            config=$(echo "$config" | jq --arg token "$SUPABASE_ACCESS_TOKEN" '.mcpServers.supabase = {
+                "command": "npx",
+                "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+                "env": {"SUPABASE_ACCESS_TOKEN": $token}
+            }')
         fi
-        config=$(echo "$config" | jq --arg token "$SUPABASE_ACCESS_TOKEN" --argjson args "$supabase_args" '.mcpServers.supabase = {
-            "command": "npx",
-            "args": $args,
-            "env": {"SUPABASE_ACCESS_TOKEN": $token}
-        }')
         echo "  + Supabase MCP enabled (local)" >&2
     else
         echo "  - Supabase MCP skipped (no SUPABASE_ACCESS_TOKEN)" >&2
