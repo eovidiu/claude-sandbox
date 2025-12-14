@@ -9,8 +9,7 @@
 
 set -euo pipefail
 
-MCP_FILE="$HOME/.claude/mcp.json"
-mkdir -p "$(dirname "$MCP_FILE")"
+MCP_FILE="$HOME/.claude.json"
 
 # Build JSON using jq for proper escaping and validation
 build_mcp_config() {
