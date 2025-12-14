@@ -25,9 +25,9 @@ build_mcp_config() {
 
     # Railway (if token provided)
     if [[ -n "${RAILWAY_TOKEN:-}" ]]; then
-        config=$(echo "$config" | jq --arg token "$RAILWAY_TOKEN" '.mcpServers.railway = {
+        config=$(echo "$config" | jq --arg token "$RAILWAY_TOKEN" '.mcpServers["railway-mcp-server"] = {
             "command": "npx",
-            "args": ["-y", "@railwayapp/railway-mcp-server"],
+            "args": ["-y", "@railway/mcp-server"],
             "env": {"RAILWAY_TOKEN": $token}
         }')
         echo "  + Railway MCP enabled" >&2
