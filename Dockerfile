@@ -119,7 +119,8 @@ RUN echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc \
 # Pre-populate SSH known hosts for common Git providers (GitHub, GitLab, Bitbucket)
 # This prevents "host key verification failed" errors on first git push
 RUN mkdir -p /home/$DEV_USER/.ssh \
-    && ssh-keyscan github.com gitlab.com bitbucket.org >> /home/$DEV_USER/.ssh/known_hosts 2>/dev/null \
+    && touch /home/$DEV_USER/.ssh/known_hosts \
+    && (ssh-keyscan github.com gitlab.com bitbucket.org >> /home/$DEV_USER/.ssh/known_hosts 2>/dev/null || true) \
     && chmod 700 /home/$DEV_USER/.ssh \
     && chmod 644 /home/$DEV_USER/.ssh/known_hosts
 
