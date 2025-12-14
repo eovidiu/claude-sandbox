@@ -137,19 +137,19 @@ RUN ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions
 
 # Copy runtime verification script (can be run manually inside container)
 COPY scripts/verify-runtimes.sh /usr/local/bin/verify-runtimes.sh
-RUN chmod +x /usr/local/bin/verify-runtimes.sh
+RUN chmod 755 /usr/local/bin/verify-runtimes.sh
 
 # Copy Claude Code installation script (can be run inside container)
 COPY scripts/install-claude.sh /usr/local/bin/install-claude.sh
-RUN chmod +x /usr/local/bin/install-claude.sh
+RUN chmod 755 /usr/local/bin/install-claude.sh
 
 # Copy MCP setup script (generates mcp.json from environment variables)
 COPY scripts/setup-mcp.sh /usr/local/bin/setup-mcp.sh
-RUN chmod +x /usr/local/bin/setup-mcp.sh
+RUN chmod 755 /usr/local/bin/setup-mcp.sh
 
 # Copy entrypoint script
 COPY config/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod 755 /usr/local/bin/entrypoint.sh
 
 # Switch to dev user for runtime
 USER $DEV_USER
