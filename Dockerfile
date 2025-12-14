@@ -127,10 +127,12 @@ RUN mkdir -p /home/$DEV_USER/.ssh \
 # Switch back to root for system-wide installations
 USER root
 
-# Create symlinks for node, npm, yarn, claude, and ccstatusline to make them available globally
+# Create symlinks for node, npm, npx, yarn, claude, and ccstatusline to make them available globally
 # This ensures tools work without sourcing nvm.sh in non-interactive shells
+# npx is required for MCP servers which use "npx" as their command
 RUN ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/node /usr/local/bin/node \
     && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/npm /usr/local/bin/npm \
+    && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/npx /usr/local/bin/npx \
     && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/yarn /usr/local/bin/yarn \
     && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/claude /usr/local/bin/claude \
     && ln -sf /home/$DEV_USER/.nvm/versions/node/$(ls /home/$DEV_USER/.nvm/versions/node | head -1)/bin/ccstatusline /usr/local/bin/ccstatusline
