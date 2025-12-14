@@ -80,12 +80,12 @@ sandbox() {
     [[ -n "$git_email" ]] && env_args+=("-e" "GIT_USER_EMAIL=$git_email")
 
     # Create container if doesn't exist
+    # Note: .gitconfig is NOT mounted - git user is configured via env vars in entrypoint
     if ! docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
         echo "Creating sandbox for ${project_name}..."
         docker run -d --name "$container" \
             -v "$(pwd):/workspace:rw" \
             -v "$HOME/.ssh:/home/dev/.ssh:ro" \
-            -v "$HOME/.gitconfig:/home/dev/.gitconfig:ro" \
             -p 3000:3000 -p 8000:8000 \
             "${env_args[@]}" \
             ghcr.io/eovidiu/claude-sandbox:latest \
