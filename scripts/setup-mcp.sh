@@ -35,16 +35,18 @@ build_mcp_config() {
         echo "  - Railway MCP skipped (no RAILWAY_TOKEN)" >&2
     fi
 
-    # Supabase (if token provided)
-    if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
-        config=$(echo "$config" | jq --arg token "$SUPABASE_ACCESS_TOKEN" '.mcpServers.supabase = {
-            "command": "npx",
-            "args": ["-y", "@supabase/mcp-server-supabase", "--access-token", $token]
-        }')
-        echo "  + Supabase MCP enabled" >&2
-    else
-        echo "  - Supabase MCP skipped (no SUPABASE_ACCESS_TOKEN)" >&2
+    # Supabase (cloud-hosted MCP server with OAuth)
+    # Uses the official Supabase MCP URL - authentication happens via browser OAuth
+    # Optional: Set SUPABASE_PROJECT_REF to scope to a specific project
+    local supabase_url="https://mcp.supabase.com/mcp"
+    if [[ -n "${SUPABASE_PROJECT_REF:-}" ]]; then
+        supabase_url="${supabase_url}?project_ref=${SUPABASE_PROJECT_REF}&read_only=true"
     fi
+    config=$(echo "$config" | jq --arg url "$supabase_url" '.mcpServers.supabase = {
+        "type": "http",
+        "url": $url
+    }')
+    echo "  + Supabase MCP enabled (cloud-hosted)" >&2
 
     # Context7 (if key provided)
     if [[ -n "${CONTEXT7_API_KEY:-}" ]]; then

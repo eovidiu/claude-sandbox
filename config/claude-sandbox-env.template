@@ -13,9 +13,10 @@
 # Get your token: https://railway.app/account/tokens
 RAILWAY_TOKEN=
 
-# Supabase - Database and backend services
-# Get your token: https://supabase.com/dashboard/account/tokens
-SUPABASE_ACCESS_TOKEN=
+# Supabase - Database and backend services (uses cloud-hosted MCP with OAuth)
+# Authentication happens via browser when you first use Supabase tools
+# Optional: Scope to a specific project (find in Project Settings > General > Project ID)
+# SUPABASE_PROJECT_REF=your_project_ref_here
 
 # Context7 - Documentation lookup for libraries
 # Get your key: https://context7.com (free tier available)
