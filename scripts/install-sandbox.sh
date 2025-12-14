@@ -57,8 +57,8 @@ sandbox() {
     fi
 
     # Show container status
-    local status=$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null || echo "not created")
-    echo "Sandbox status: $status"
+    local container_status=$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null || echo "not created")
+    echo "Sandbox status: $container_status"
 
     # Build environment variable arguments
     local env_args=()
