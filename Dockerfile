@@ -42,6 +42,8 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     software-properties-common \
     sudo \
+    jq \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python 3.11+ from deadsnakes PPA (system-wide, before user creation)
@@ -99,7 +101,11 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | b
     && nvm use default \
     && npm install -g yarn \
     && npm install -g @anthropic-ai/claude-code \
-    && npm install -g ccstatusline
+    && npm install -g ccstatusline \
+    && npm install -g @playwright/mcp \
+    && npm install -g @railwayapp/railway-mcp-server \
+    && npm install -g @supabase/mcp-server-supabase \
+    && npm install -g @upstash/context7-mcp
 
 # Create Claude Code settings with statusline configuration
 RUN mkdir -p /home/$DEV_USER/.claude \
@@ -109,6 +115,13 @@ RUN mkdir -p /home/$DEV_USER/.claude \
 RUN echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.bashrc \
     && echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.bashrc \
     && echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"' >> ~/.bashrc
+
+# Pre-populate SSH known hosts for common Git providers (GitHub, GitLab, Bitbucket)
+# This prevents "host key verification failed" errors on first git push
+RUN mkdir -p /home/$DEV_USER/.ssh \
+    && ssh-keyscan github.com gitlab.com bitbucket.org >> /home/$DEV_USER/.ssh/known_hosts 2>/dev/null \
+    && chmod 700 /home/$DEV_USER/.ssh \
+    && chmod 644 /home/$DEV_USER/.ssh/known_hosts
 
 # Switch back to root for system-wide installations
 USER root
@@ -128,6 +141,10 @@ RUN chmod +x /usr/local/bin/verify-runtimes.sh
 # Copy Claude Code installation script (can be run inside container)
 COPY scripts/install-claude.sh /usr/local/bin/install-claude.sh
 RUN chmod +x /usr/local/bin/install-claude.sh
+
+# Copy MCP setup script (generates mcp.json from environment variables)
+COPY scripts/setup-mcp.sh /usr/local/bin/setup-mcp.sh
+RUN chmod +x /usr/local/bin/setup-mcp.sh
 
 # Copy entrypoint script
 COPY config/entrypoint.sh /usr/local/bin/entrypoint.sh
