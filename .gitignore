@@ -23,3 +23,6 @@ test-results/
 # Temporary files
 tmp/
 *.bak
+
+# MCP todo list
+.mcp-todos.json
