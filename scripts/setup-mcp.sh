@@ -34,17 +34,21 @@ build_mcp_config() {
         echo "  - Railway MCP skipped (no RAILWAY_TOKEN)" >&2
     fi
 
-    # Supabase (cloud-hosted MCP with pre-authenticated URL)
-    # Get your MCP URL from: https://supabase.com/dashboard/project/_?showConnect=true&connectTab=mcp
-    # The URL includes your authentication and project scope
-    if [[ -n "${SUPABASE_MCP_URL:-}" ]]; then
-        config=$(echo "$config" | jq --arg url "$SUPABASE_MCP_URL" '.mcpServers.supabase = {
-            "type": "http",
-            "url": $url
+    # Supabase (local MCP server with personal access token)
+    # Get your token from: https://supabase.com/dashboard/account/tokens
+    if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+        local supabase_args='["-y", "@supabase/mcp-server-supabase@latest"]'
+        if [[ -n "${SUPABASE_PROJECT_REF:-}" ]]; then
+            supabase_args="["-y", \"@supabase/mcp-server-supabase@latest\", \"--project-ref\", \"${SUPABASE_PROJECT_REF}\"]"
+        fi
+        config=$(echo "$config" | jq --arg token "$SUPABASE_ACCESS_TOKEN" --argjson args "$supabase_args" '.mcpServers.supabase = {
+            "command": "npx",
+            "args": $args,
+            "env": {"SUPABASE_ACCESS_TOKEN": $token}
         }')
-        echo "  + Supabase MCP enabled" >&2
+        echo "  + Supabase MCP enabled (local)" >&2
     else
-        echo "  - Supabase MCP skipped (no SUPABASE_MCP_URL)" >&2
+        echo "  - Supabase MCP skipped (no SUPABASE_ACCESS_TOKEN)" >&2
     fi
 
     # Context7 (if key provided)

@@ -14,13 +14,10 @@
 RAILWAY_TOKEN=
 
 # Supabase - Database and backend services
-# Get your MCP URL from Supabase Dashboard:
-#   1. Go to your project in Supabase Dashboard
-#   2. Click "Connect" button (top right)
-#   3. Select "MCP" tab
-#   4. Copy the full URL (includes auth token)
-# Example: https://mcp.supabase.com/mcp?project_ref=abc123&read_only=true
-SUPABASE_MCP_URL=
+# Get your access token from: https://supabase.com/dashboard/account/tokens
+SUPABASE_ACCESS_TOKEN=
+# Optional: Scope to specific project (Project Settings > General > Project ID)
+# SUPABASE_PROJECT_REF=your_project_ref_here
 
 # Context7 - Documentation lookup for libraries
 # Get your key: https://context7.com (free tier available)
