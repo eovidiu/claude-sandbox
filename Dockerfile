@@ -103,7 +103,7 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | b
     && npm install -g @anthropic-ai/claude-code \
     && npm install -g ccstatusline \
     && npm install -g @playwright/mcp \
-    && npm install -g @railwayapp/railway-mcp-server \
+    && npm install -g @railway/mcp-server \
     && npm install -g @supabase/mcp-server-supabase \
     && npm install -g @upstash/context7-mcp
 
