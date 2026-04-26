@@ -112,41 +112,24 @@ CONTEXT7_API_KEY=your_key_here
 # Start sandbox in current project
 cd /path/to/project
 sandbox
-
-# Reset sandbox (fresh container)
-sandbox --reset
-
-# List all sandboxes
-sandbox-ls
-
-# Remove current project's sandbox
-sandbox-rm
-
-# Remove specific sandbox
-sandbox-rm project-name
-
-# Open bash shell in sandbox
-sandbox-shell
 ```
 
 ### What Happens When You Run `sandbox`
 
-1. Checks if container exists for current directory
-2. Creates container if needed with:
+1. Starts a fresh transient container with:
    - Current directory mounted to `/workspace`
-   - SSH keys mounted (read-only)
-   - Git config mounted (read-only)
+   - Docker bridge networking
+   - `ANTHROPIC_API_KEY` forwarded from the host when set
    - MCP API keys passed as env vars
-3. Starts the container
-4. Generates MCP configuration from env vars
-5. Launches Claude Code
+2. Generates MCP configuration from env vars
+3. Launches Claude Code
+4. Removes the container on exit
 
 ### Git Operations
 
-Git push/pull works automatically because:
-- Your SSH keys are mounted (read-only)
-- Your `.gitconfig` is mounted (read-only)
-- Common Git hosts (GitHub, GitLab, Bitbucket) are pre-trusted
+Git identity is forwarded from your host `git config --global user.name` and
+`user.email`. SSH keys are not mounted by default; if you need SSH push access,
+use the direct Docker command and add an explicit read-only SSH mount.
 
 ```bash
 # Inside the sandbox, these just work:
@@ -176,15 +159,6 @@ These functions are added to your `~/.zshrc`:
 ```bash
 # Start Claude Code in isolated container
 sandbox() { ... }
-
-# Remove a sandbox container
-sandbox-rm() { ... }
-
-# List all sandbox containers
-sandbox-ls() { ... }
-
-# Open bash shell in sandbox
-sandbox-shell() { ... }
 ```
 
 See [install-sandbox.sh](../scripts/install-sandbox.sh) for the full implementation.
@@ -193,11 +167,16 @@ See [install-sandbox.sh](../scripts/install-sandbox.sh) for the full implementat
 
 ### "Permission denied" on git push
 
-Your SSH keys may not be readable:
+SSH keys are not mounted by default. If you need SSH operations from inside the
+container, add an explicit read-only mount:
+
 ```bash
-chmod 700 ~/.ssh
-chmod 600 ~/.ssh/id_*
-chmod 644 ~/.ssh/*.pub
+docker run -it --rm \
+  --network bridge \
+  -v "$PWD:/workspace:rw" \
+  -v "$HOME/.ssh:/home/dev/.ssh:ro" \
+  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+  ghcr.io/eovidiu/claude-sandbox:latest
 ```
 
 ### MCP server not working
@@ -209,7 +188,6 @@ grep RAILWAY_TOKEN ~/.claude-sandbox-env
 
 Check the MCP configuration inside the container:
 ```bash
-sandbox-shell
 cat ~/.claude/mcp.json
 ```
 
@@ -220,26 +198,16 @@ Check Docker is running:
 docker info
 ```
 
-Check for port conflicts:
+Check for port conflicts if you added `-p` mappings:
 ```bash
 docker ps -a | grep 3000
 ```
 
-Reset the sandbox:
-```bash
-sandbox --reset
-```
-
 ### Old container state persisting
 
-Use `--reset` to get a fresh container:
+The default `sandbox` command is transient and removes the container on exit:
 ```bash
-sandbox --reset
-```
-
-Or remove all sandboxes:
-```bash
-docker rm -f $(docker ps -a --filter "name=sandbox-" -q)
+sandbox
 ```
 
 ## Updating
@@ -249,8 +217,8 @@ docker rm -f $(docker ps -a --filter "name=sandbox-" -q)
 ```bash
 docker pull ghcr.io/eovidiu/claude-sandbox:latest
 
-# Reset existing sandboxes to use new image
-sandbox --reset
+# Start a fresh container with the new image
+sandbox
 ```
 
 ### Update Sandbox Functions

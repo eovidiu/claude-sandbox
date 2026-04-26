@@ -45,36 +45,11 @@ Add this at the end:
 export ANTHROPIC_API_KEY="your-api-key-here"
 
 sandbox() {
-    local project_name=$(basename "$(pwd)" | tr '.' '-')
-    local container="sandbox-${project_name}"
-
-    # Create if doesn't exist
-    if ! docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
-        echo "Creating sandbox for ${project_name}..."
-        docker run -d --name "$container" \
-            -v "$(pwd):/workspace:rw" \
-            -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
-            -p 3000:3000 -p 8000:8000 \
-            ghcr.io/eovidiu/claude-sandbox:latest \
-            tail -f /dev/null
-    fi
-
-    # Start if stopped
-    docker start "$container" 2>/dev/null
-
-    # Launch Claude Code directly
-    docker exec -it -w /workspace "$container" claude --dangerously-skip-permissions
-}
-
-# Cleanup helper: sandbox-rm [project-name]
-sandbox-rm() {
-    local container="sandbox-${1:-$(basename "$(pwd)" | tr '.' '-')}"
-    docker rm -f "$container" 2>/dev/null && echo "Removed $container" || echo "Container $container not found"
-}
-
-# List all sandboxes
-sandbox-ls() {
-    docker ps -a --filter "name=sandbox-" --format "table {{.Names}}\t{{.Status}}\t{{.Size}}"
+    docker run -it --rm \
+        --network bridge \
+        -v "$PWD:/workspace:rw" \
+        -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+        ghcr.io/eovidiu/claude-sandbox:latest
 }
 ```
 
@@ -100,8 +75,7 @@ sandbox
 # Claude Code launches automatically with --dangerously-skip-permissions
 ```
 
-**First time per project**: Container creation (~5 seconds)
-**Every time after**: Instant (Claude launches automatically)
+Each run starts a fresh container and removes it on exit. Your current directory remains mounted read/write at `/workspace`.
 
 ---
 
@@ -110,9 +84,6 @@ sandbox
 | Command | What it does |
 |---------|--------------|
 | `sandbox` | Launch Claude Code in sandbox for current directory |
-| `sandbox-ls` | List all sandbox containers |
-| `sandbox-rm` | Remove sandbox for current directory |
-| `sandbox-rm project-name` | Remove a specific sandbox |
 
 ---
 
@@ -121,15 +92,14 @@ sandbox
 If you don't want to modify your shell config:
 
 ```bash
-# Run with your project mounted (Claude needs installing each time)
+# Run with your current project mounted
 docker run -it --rm \
-  -v ~/your-project:/workspace:rw \
-  -e ANTHROPIC_API_KEY=your-key \
+  --network bridge \
+  -v "$PWD:/workspace:rw" \
+  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   ghcr.io/eovidiu/claude-sandbox:latest
 
-# Inside container
-install-claude.sh --verify
-claude --dangerously-skip-permissions
+# Claude Code launches automatically with --dangerously-skip-permissions
 ```
 
 ---
@@ -160,9 +130,9 @@ Mount your project and give Claude full access to modify, test, and build:
 
 ```bash
 docker run -it --rm \
-  -v ~/my-app:/workspace:rw \
-  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-  -p 3000:3000 \
+  --network bridge \
+  -v "$PWD:/workspace:rw" \
+  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   ghcr.io/eovidiu/claude-sandbox:latest
 
 # Inside container
@@ -178,7 +148,8 @@ Let Claude install any npm/pip packages without affecting your host:
 
 ```bash
 docker run -it --rm \
-  -v ~/experiments:/workspace:rw \
+  --network bridge \
+  -v "$PWD:/workspace:rw" \
   ghcr.io/eovidiu/claude-sandbox:latest
 
 # Inside container
@@ -194,13 +165,15 @@ Run multiple isolated environments simultaneously:
 ```bash
 # Terminal 1: Frontend project
 docker run -it --rm --name frontend \
-  -v ~/frontend:/workspace:rw \
+  --network bridge \
+  -v "$PWD:/workspace:rw" \
   -p 3000:3000 \
   ghcr.io/eovidiu/claude-sandbox:latest
 
 # Terminal 2: Backend project
 docker run -it --rm --name backend \
-  -v ~/backend:/workspace:rw \
+  --network bridge \
+  -v "$PWD:/workspace:rw" \
   -p 8000:8000 \
   ghcr.io/eovidiu/claude-sandbox:latest
 ```
@@ -211,7 +184,8 @@ Test your CI pipeline commands in the same environment:
 
 ```bash
 docker run --rm \
-  -v ~/project:/workspace:rw \
+  --network bridge \
+  -v "$PWD:/workspace:rw" \
   ghcr.io/eovidiu/claude-sandbox:latest \
   bash -c "npm ci && npm test && npm run build"
 ```
@@ -225,9 +199,6 @@ docker run --rm \
 | Command | What it does |
 |---------|--------------|
 | `sandbox` | Enter sandbox for current project |
-| `sandbox-ls` | List all sandbox containers |
-| `sandbox-rm` | Remove current project's sandbox |
-| `sandbox-rm name` | Remove specific sandbox |
 
 ### Inside Container
 
@@ -241,10 +212,9 @@ docker run --rm \
 
 | Task | Command |
 |------|---------|
-| **Interactive shell** | `docker run -it --rm -v ~/project:/workspace:rw ghcr.io/eovidiu/claude-sandbox:latest` |
-| **Run single command** | `docker run --rm -v ~/project:/workspace:rw ghcr.io/eovidiu/claude-sandbox:latest node -v` |
-| **With API key** | `docker run -it --rm -v ~/project:/workspace:rw -e ANTHROPIC_API_KEY=sk-xxx ghcr.io/eovidiu/claude-sandbox:latest` |
-| **With ports** | `docker run -it --rm -v ~/project:/workspace:rw -p 3000:3000 ghcr.io/eovidiu/claude-sandbox:latest` |
+| **Interactive Claude** | `docker run -it --rm --network bridge -v "$PWD:/workspace:rw" -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" ghcr.io/eovidiu/claude-sandbox:latest` |
+| **Run single command** | `docker run --rm --network bridge -v "$PWD:/workspace:rw" ghcr.io/eovidiu/claude-sandbox:latest node -v` |
+| **With ports** | `docker run -it --rm --network bridge -v "$PWD:/workspace:rw" -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" -p 3000:3000 ghcr.io/eovidiu/claude-sandbox:latest` |
 
 ---
 
@@ -425,9 +395,9 @@ Run with: `docker compose -f docker-compose.dev.yml run sandbox`
 
 sandbox:
 	docker run -it --rm \
-		-v $(PWD):/workspace:rw \
-		-e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
-		-p 3000:3000 \
+		--network bridge \
+		-v "$$(PWD):/workspace:rw" \
+		-e ANTHROPIC_API_KEY="$${ANTHROPIC_API_KEY}" \
 		ghcr.io/eovidiu/claude-sandbox:latest
 ```
 
@@ -444,8 +414,8 @@ Run with: `make sandbox`
 | `sandbox: command not found` | Run `source ~/.zshrc` to reload shell |
 | `claude: command not found` | Run `install-claude.sh --verify` inside container |
 | `node: command not found` | Run `. ~/.nvm/nvm.sh` or re-enter with `sandbox` |
-| Port already in use | Remove sandbox: `sandbox-rm` then re-run `sandbox` |
-| Container name exists | Run `sandbox-rm` to remove it |
+| Port already in use | Stop the host process using that port or change the `-p` mapping |
+| Container name exists | Use the transient `sandbox` function or remove the named container with `docker rm -f <name>` |
 | Permission denied on mount | Check host directory permissions |
 
 ### Verify Installation
@@ -459,16 +429,12 @@ install-claude.sh --verify # Check Claude Code
 ### Reset a Project's Sandbox
 
 ```bash
-sandbox-rm              # Remove current project's sandbox
-sandbox                 # Create fresh sandbox
+sandbox                 # Every run creates a fresh transient container
 ```
 
-### Full Reset (All Sandboxes)
+### Refresh Image
 
 ```bash
-# Remove all sandbox containers
-docker rm -f $(docker ps -a --filter "name=sandbox-" -q) 2>/dev/null
-
 # Remove and re-pull image
 docker rmi ghcr.io/eovidiu/claude-sandbox:latest
 docker pull ghcr.io/eovidiu/claude-sandbox:latest
@@ -491,23 +457,19 @@ cd claude-sandbox
 docker build -t claude-sandbox:local .
 
 # Run local build
-docker run -it --rm -v ~/projects:/workspace:rw claude-sandbox:local
+docker run -it --rm --network bridge -v "$PWD:/workspace:rw" claude-sandbox:local
 ```
 
-### Update Existing Sandboxes After Rebuild
+### Use Rebuilt Image
 
-If you rebuild the image, existing sandbox containers still use the old image. To update:
+If you rebuild the image, the transient `sandbox` function will use the rebuilt tag on the next run:
 
 ```bash
-# Remove existing sandbox for a project
-cd ~/work/your-project
-sandbox-rm
-
 # Pull new image (if using remote) or rebuild locally
 docker pull ghcr.io/eovidiu/claude-sandbox:latest
 # OR: docker build -t ghcr.io/eovidiu/claude-sandbox:latest .
 
-# Re-enter (creates new container with new image)
+# Start a fresh transient container
 sandbox
 ```
 
