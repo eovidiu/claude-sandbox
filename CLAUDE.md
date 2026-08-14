@@ -16,7 +16,8 @@ Containers fronted by a Durable Object.
   will not deploy.
 - `wrangler.jsonc` — container, Durable Object binding, SQLite migration.
   Two deliberate changes from the upstream template: `instance_type: basic`
-  (`lite`'s 256 MiB is too small for pip installs) and `max_instances: 3`.
+  (`lite`'s 256 MiB is too small for pip installs) and `max_instances: 5`
+  (the platform default is 20; this is lower to bound cost).
 - `Dockerfile` — `cloudflare/sandbox:0.12.5` plus `python3`, `python3-pip`,
   `python3-venv`. The base image has no Python despite what some docs claim.
 
