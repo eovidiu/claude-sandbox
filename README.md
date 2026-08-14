@@ -23,6 +23,7 @@ Cloudflare Sandbox that has no access to your local files.
 | `sandbox_read_file` | `sandboxId`, `path` |
 | `sandbox_list_files` | `sandboxId`, `path` |
 | `sandbox_destroy` | `sandboxId` |
+| `sandbox_list` | — |
 
 Reusing a `sandboxId` reuses the same container, so a write / execute / read
 sequence shares state. A non-zero exit comes back as a normal result carrying
@@ -32,6 +33,13 @@ read the failure and react to it.
 The image is `cloudflare/sandbox` plus Python. The base image ships Node, npm,
 npx and bun but no Python interpreter, so the Dockerfile adds `python3`,
 `python3-pip` and `python3-venv`.
+
+`sandbox_list` reports what **this server** created and when each was last used.
+It is not a live view of Cloudflare: idle containers are reclaimed silently, so
+entries can outlive their sandbox. Destroying an already-reclaimed sandbox is
+harmless. For authoritative state use
+`npx wrangler containers instances <application-id>`, which lists real instances
+by name with their running/inactive status.
 
 ## Deploy
 
@@ -94,9 +102,9 @@ Four things worth knowing before you rely on it:
    or `git clone` inside the sandbox.
 2. **`sandboxId` is the unit of isolation.** Reuse an id to keep state across
    calls; use a different id when work must not share a filesystem.
-3. **Three concurrent sandboxes maximum** (`max_instances`). A fourth fails with
-   `ContainerUnavailableError`. For batch work, destroy each sandbox before
-   starting the next.
+3. **Five concurrent sandboxes maximum** (`max_instances`). A sixth fails, and
+   the error names the least recently used sandboxes so you can destroy one and
+   retry. Only *running* containers count; stopped ones do not.
 4. **Destroy sandboxes when finished.** An idle container holds its slot for
    about ten minutes and bills against the monthly allowance until it sleeps.
 
