@@ -14,8 +14,9 @@
       // "lite" (1/16 vCPU, 256 MiB) is too small for pip installs and scrapers.
       // "basic" is 1/4 vCPU, 1 GiB, 4 GB disk.
       "instance_type": "basic",
-      // Allows a few concurrently named sandboxes rather than a single global one.
-      "max_instances": 3
+      // Concurrent running containers. Stopped ones do not count. The platform
+      // default is 20; this is deliberately lower to bound cost.
+      "max_instances": 5
     }
   ],
   "durable_objects": {
@@ -23,6 +24,10 @@
       {
         "class_name": "Sandbox",
         "name": "Sandbox"
+      },
+      {
+        "class_name": "SandboxRegistry",
+        "name": "SandboxRegistry"
       }
     ]
   },
@@ -30,6 +35,10 @@
     {
       "new_sqlite_classes": ["Sandbox"],
       "tag": "v1"
+    },
+    {
+      "new_sqlite_classes": ["SandboxRegistry"],
+      "tag": "v2"
     }
   ]
 }

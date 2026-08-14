@@ -45,11 +45,20 @@ npx wrangler types   # after changing wrangler.jsonc or .dev.vars
   `createMcpHandler`. Do not reintroduce the Durable Object MCP pattern.
 - Do not run `claude mcp list` when output is captured; it prints stdio server
   argv with API keys in plaintext.
-- `max_instances` is a hard ceiling on *concurrent* sandboxes. Exceeding it
-  fails with `ContainerUnavailableError`, and a sandbox holds its slot for about
-  ten minutes after last use unless `sandbox_destroy` is called. There is no
-  tool to list running sandboxes, so a caller that hits the ceiling cannot
-  discover what is holding it.
+- `max_instances` is a hard ceiling on *concurrent running* sandboxes; stopped
+  ones do not count. Exceeding it raises `ContainerUnavailableError`, which
+  `withSandbox` rewrites into a list of reclaim candidates.
+- **That error crosses a Durable Object RPC boundary, which strips the prototype
+  chain and the custom `reason` field.** `instanceof ContainerUnavailableError`
+  is false by the time the Worker sees it, so `isSlotExhausted` matches on the
+  message text — the same way the SDK itself detects this condition. Do not
+  "simplify" it back to an instanceof check; it will silently stop firing.
+- A container only holds a slot while a command is actually running. A
+  backgrounded command (`sleep 60 &`) returns immediately and the container goes
+  inactive, so it cannot be used to reproduce the ceiling — use concurrent
+  foreground work.
+- `wrangler containers instances <app-id>` lists real instances by name; the
+  registry is only what this Worker recorded and drifts from it.
 - `exit N` inside a sandbox terminates its persistent shell and surfaces as
   `SessionTerminatedError`. That is distinct from a command that merely fails,
   which returns its exit code and stderr as a normal result.
