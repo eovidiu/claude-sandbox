@@ -45,6 +45,16 @@ npx wrangler types   # after changing wrangler.jsonc or .dev.vars
   `createMcpHandler`. Do not reintroduce the Durable Object MCP pattern.
 - Do not run `claude mcp list` when output is captured; it prints stdio server
   argv with API keys in plaintext.
+- `max_instances` is a hard ceiling on *concurrent* sandboxes. Exceeding it
+  fails with `ContainerUnavailableError`, and a sandbox holds its slot for about
+  ten minutes after last use unless `sandbox_destroy` is called. There is no
+  tool to list running sandboxes, so a caller that hits the ceiling cannot
+  discover what is holding it.
+- `exit N` inside a sandbox terminates its persistent shell and surfaces as
+  `SessionTerminatedError`. That is distinct from a command that merely fails,
+  which returns its exit code and stderr as a normal result.
+- `wrangler containers list` shows configured capacity in `LIVE INSTANCES`.
+  Read `health.instances.active` from `wrangler containers info` instead.
 
 ## Verifying a change
 

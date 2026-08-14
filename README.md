@@ -77,6 +77,56 @@ after a `401`, so rotating the token only means rewriting the file and running
 MCP servers are loaded when a session starts; a session already running when you
 add the server will not see it until restarted.
 
+## Using it from Claude Code
+
+There is nothing to start. The server is remote and always on, so just run
+`claude` and ask for what you want in plain language:
+
+> In a Cloudflare sandbox called `scrape-1`, install requests, fetch
+> example.com, print the page title, then destroy the sandbox.
+
+Confirm the server is connected with `/mcp`.
+
+Four things worth knowing before you rely on it:
+
+1. **The sandbox cannot see your repository.** It is a fresh container in
+   Cloudflare with no copy of your files. Get code in with `sandbox_write_file`,
+   or `git clone` inside the sandbox.
+2. **`sandboxId` is the unit of isolation.** Reuse an id to keep state across
+   calls; use a different id when work must not share a filesystem.
+3. **Three concurrent sandboxes maximum** (`max_instances`). A fourth fails with
+   `ContainerUnavailableError`. For batch work, destroy each sandbox before
+   starting the next.
+4. **Destroy sandboxes when finished.** An idle container holds its slot for
+   about ten minutes and bills against the monthly allowance until it sleeps.
+
+Non-interactively, name the tools you want to allow:
+
+```sh
+claude -p "run uname -a in sandbox test-1" \
+  --allowedTools "mcp__cloudflare-sandbox__sandbox_execute"
+```
+
+## Turning it off
+
+| Goal | How |
+|---|---|
+| Off for now, keep config | `/mcp`, select the server, toggle it off |
+| Off permanently, keep config | `"disabledMcpServers": ["cloudflare-sandbox"]` in `~/.claude/settings.json` |
+| Off for a single run | `claude --disallowedTools "mcp__cloudflare-sandbox__sandbox_execute" ...` |
+| Ignore every configured MCP server | `claude --strict-mcp-config --mcp-config '{"mcpServers":{}}'` |
+| Remove the client config | `claude mcp remove cloudflare-sandbox -s user` |
+
+To disable the service itself, so no client can reach it regardless of local
+configuration, delete the secret. The Worker fails closed and answers `503`:
+
+```sh
+npx wrangler secret delete MCP_SECRET_TOKEN
+```
+
+`npx wrangler delete` goes further and removes the Worker and its container
+application entirely.
+
 ## Security
 
 The bearer token is the only barrier between the public internet and arbitrary
