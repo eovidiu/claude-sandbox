@@ -1,4 +1,4 @@
-# Contributing to Isolated Development Environment
+# Contributing to cloudflare-sandbox-mcp
 
 Thank you for your interest in contributing! This project welcomes contributions from the community.
 
@@ -38,95 +38,56 @@ Look for issues labeled `good-first-issue` to get started. These are typically:
 
 ### Prerequisites
 
-- macOS (Intel or Apple Silicon)
-- OrbStack or Docker Desktop
-- bats-core (for running tests)
+- Node 18+
+- Docker, for `wrangler dev` and `wrangler deploy` (both build the container image)
+- A Cloudflare account on the Workers Paid plan, to deploy
 
 ```bash
-# Install bats testing framework
-brew install bats-core bats-support bats-assert bats-file
+git clone https://github.com/eovidiu/claude-sandbox.git
+cd claude-sandbox
+npm install
 
-# Clone the repository
-git clone https://github.com/eovidiu/dev-setup.git
-cd dev-setup
-
-# Copy configuration template
-cp config/.env.template config/.env
-
-# Edit config/.env with your settings
-nano config/.env
+# Local-only token for `wrangler dev`; this file is gitignored
+echo 'MCP_SECRET_TOKEN="local-dev-only-not-a-secret"' > .dev.vars
 ```
 
-### Running Tests
+### Running Locally
 
 ```bash
-# Run all tests
-bats tests/
-
-# Run specific test file
-bats tests/test-env-up.bats
-
-# Run with verbose output
-bats -t tests/
-```
-
-### Building the Docker Image
-
-```bash
-# Build the image
-docker build -t isolated-dev-env:latest .
-
-# Test the image
-./scripts/dev-env-up.sh
-./scripts/dev-env-shell.sh claude-dev --command "verify-runtimes.sh"
-./scripts/dev-env-down.sh claude-dev --force
+npm run typecheck
+npm run dev
 ```
 
 ## Testing Guidelines
 
-All contributions should include tests. We use **bats-core** for testing.
+Verification is done against a running server rather than a unit test suite,
+because everything of interest is the interaction between the Worker, the
+Durable Object and the container.
 
-### Test Structure
+With `npm run dev` up, POST JSON-RPC to `http://localhost:8787/mcp`. A change is
+good when all of these hold:
 
-```bash
-#!/usr/bin/env bats
-# Tests for [feature name]
-
-load test_helper/bats-support/load
-load test_helper/bats-assert/load
-
-setup() {
-    # Setup test environment
-}
-
-teardown() {
-    # Cleanup test environment
-}
-
-@test "descriptive test name" {
-    run ./scripts/your-script.sh
-    assert_success
-    assert_output --partial "expected output"
-}
-```
-
-### Test Requirements
-
-- ✅ All new features must have tests
-- ✅ Tests must pass locally before submitting PR
-- ✅ Tests should be isolated (no dependencies between tests)
-- ✅ Use descriptive test names
-- ✅ Clean up resources in `teardown()`
-
-### Running Specific Tests
+- no `Authorization` header returns `401`
+- a wrong token returns `401`
+- a correct token returns `200`
+- `tools/list` returns all five tools
+- a `sandbox_write_file` → `sandbox_execute` → `sandbox_read_file` →
+  `sandbox_destroy` round trip succeeds against one `sandboxId`
 
 ```bash
-# Run tests for a specific feature
-bats tests/test-secret-injection.bats
-
-# Run a single test
-bats tests/test-env-up.bats --filter "creates container successfully"
+curl -s -X POST http://localhost:8787/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Authorization: Bearer local-dev-only-not-a-secret' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
+
+### Requirements for a change
+
+- ✅ `npm run typecheck` passes
+- ✅ The checks above pass locally before you open a PR
+- ✅ New tools are exercised by a round trip, not just `tools/list`
+- ✅ Sandboxes created while testing are destroyed afterwards
 
 ## Commit Guidelines
 
@@ -179,10 +140,10 @@ git commit -m "test(isolation): add network namespace verification"
 
 ### Before Submitting
 
-1. ✅ **Run all tests**: `bats tests/`
-2. ✅ **Update documentation**: README, troubleshooting guide, etc.
-3. ✅ **Follow code style**: Match existing shell script conventions
-4. ✅ **Add inline comments**: Explain "why" not "what"
+1. ✅ **Typecheck and verify**: `npm run typecheck`, then the round trip above
+2. ✅ **Update documentation**: README and CLAUDE.md
+3. ✅ **Follow code style**: match the existing TypeScript conventions
+4. ✅ **Add inline comments**: explain "why" not "what"
 5. ✅ **Check for secrets**: No hardcoded credentials or personal paths
 
 ### PR Checklist
@@ -239,17 +200,17 @@ Clear description of the bug
 
 **To Reproduce**
 Steps to reproduce:
-1. Run command: `./scripts/dev-env-up.sh`
+1. Call tool: `sandbox_execute` with ...
 2. See error
 
 **Expected Behavior**
 What you expected to happen
 
 **Environment**
-- macOS version: [e.g., Sonoma 14.5]
-- Architecture: [Intel/Apple Silicon]
-- Docker/OrbStack version: [e.g., OrbStack 1.5.0]
-- Script version: [from git commit hash]
+- Local or deployed: [wrangler dev / workers.dev]
+- Wrangler version: [`npx wrangler --version`]
+- Worker version ID: [from `wrangler deploy` output]
+- Docker version: [`docker info --format '{{.ServerVersion}}'`, local only]
 
 **Logs**
 ```bash
@@ -287,41 +248,33 @@ Examples, mockups, or references
 
 ## Code Style Guidelines
 
-### Shell Scripts
+### TypeScript
 
-```bash
-#!/bin/bash
-# Script description
-# Part of User Story X
-
-set -euo pipefail  # Always use strict mode
-
-# Use meaningful variable names
-ENV_NAME="claude-dev"
-
-# Functions have documentation
-#######################################
-# Description of what function does
-# Globals:
-#   VARIABLE_NAME
-# Arguments:
-#   $1 - Description
-# Returns:
-#   0 - Success
-#   1 - Failure
-#######################################
-function_name() {
-    local param="$1"
-    # Implementation
-}
-
-# Use descriptive error messages
-error_exit "Configuration file not found: $CONFIG_FILE" $EXIT_INVALID_ARGS
-
-# Comment the "why" not the "what"
-# Use symlinks instead of PATH modification to avoid shell-specific issues
-ln -sf /usr/local/bin/node /usr/bin/node
+```ts
+// Describe every tool argument. The description is what the calling model
+// sees, so it is part of the interface, not a comment.
+server.registerTool(
+  'sandbox_read_file',
+  {
+    title: 'Read a file from an edge sandbox',
+    description: 'Returns the contents of a file inside the sandbox.',
+    inputSchema: z.object({
+      sandboxId,
+      path: z.string().min(1).describe('Absolute path to read.')
+    })
+  },
+  async ({ sandboxId, path }) => {
+    const file = await getSandbox(env.Sandbox, sandboxId).readFile(path);
+    return text(file.content);
+  }
+);
 ```
+
+- Return a failed command as a normal result carrying stderr and the exit code.
+  Throwing hides the detail the caller needs to recover.
+- Comment the "why" not the "what". The Dockerfile explains why Python is added;
+  the auth helper explains why both sides are hashed before comparison.
+- Prefer the `sandbox.*` methods over the SDK's internal clients.
 
 ### Documentation
 
