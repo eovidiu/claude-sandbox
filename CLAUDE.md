@@ -1,29 +1,54 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with
+code in this repository.
 
 ## Project Overview
 
-This is a development setup repository currently in its initial stages. The repository structure and tooling will evolve as the project develops.
+An MCP server on Cloudflare Workers exposing sandboxed command execution at the
+edge. One Worker, no backend, no local runtime. Sandboxes are Cloudflare
+Containers fronted by a Durable Object.
 
-## Repository Structure
+## Architecture
 
-Currently minimal structure with:
-- `requirements` - Empty file, likely intended for Python dependencies
+- `src/index.ts` — the whole server: bearer guard, MCP server, five tools.
+  Keep `export { Sandbox } from '@cloudflare/sandbox'`; without it the Worker
+  will not deploy.
+- `wrangler.jsonc` — container, Durable Object binding, SQLite migration.
+  Two deliberate changes from the upstream template: `instance_type: basic`
+  (`lite`'s 256 MiB is too small for pip installs) and `max_instances: 3`.
+- `Dockerfile` — `cloudflare/sandbox:0.12.5` plus `python3`, `python3-pip`,
+  `python3-venv`. The base image has no Python despite what some docs claim.
 
-## Development Workflow
+## Commands
 
-This section will be populated as build, test, and development commands are established.
+```sh
+npm run typecheck
+npm run dev          # requires Docker
+npm run deploy
+npx wrangler types   # after changing wrangler.jsonc or .dev.vars
+```
 
-## Notes
+## Constraints and gotchas
 
-- Repository is on `main` branch
-- No commits yet - this is a fresh repository
-- Development practices and architecture will be documented here as they are established
+- Containers require the Workers Paid plan. `wrangler deploy` needs a local
+  Docker daemon to build and push the image.
+- `MCP_SECRET_TOKEN` is a Cloudflare secret. Never commit it and never echo it —
+  session transcripts persist to `~/.claude/projects/**/*.jsonl`. Pipe it
+  straight from `openssl` into the token file and into `wrangler secret put`.
+- `agents` peers on `zod@^4`. Installing zod 3 fails resolution.
+- `@modelcontextprotocol/server` v2 takes a full `z.object(...)` as
+  `inputSchema`, not the bare shape the older `@modelcontextprotocol/sdk` used.
+- `@cloudflare/sandbox` 1.0 will change `exec()` to argv-only and return a
+  process handle. Stay on the 0.12.x line until that is handled.
+- Cloudflare deprecated `McpAgent` in favour of the stateless
+  `createMcpHandler`. Do not reintroduce the Durable Object MCP pattern.
+- Do not run `claude mcp list` when output is captured; it prints stdio server
+  argv with API keys in plaintext.
 
-## Active Technologies
-- Shell scripting (Bash/Zsh) for orchestration, Dockerfile for image definition + OrbStack for containerization (chosen for macOS performance and native Apple Silicon support) (001-isolated-dev-env)
-- Container volumes for isolated filesystem, bind mounts for host code access (001-isolated-dev-env)
+## Verifying a change
 
-## Recent Changes
-- 001-isolated-dev-env: Added Shell scripting (Bash/Zsh) for orchestration, Dockerfile for image definition + OrbStack for containerization (chosen for macOS performance and native Apple Silicon support)
+`wrangler dev`, then POST JSON-RPC to `http://localhost:8787/mcp`. The checks
+worth keeping green: no header and a wrong token both return `401`, a correct
+token returns `200`, `tools/list` returns five tools, and a
+write → execute → read → destroy round trip succeeds.
