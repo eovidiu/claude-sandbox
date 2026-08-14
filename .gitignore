@@ -1,7 +1,15 @@
 # Environment variables (secrets)
 .env
 .env.*
-!.env.template
+.dev.vars
+.dev.vars.*
+
+# Node
+node_modules/
+
+# Wrangler build and local state
+.wrangler/
+dist/
 
 # macOS
 .DS_Store

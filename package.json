@@ -1,0 +1,26 @@
+{
+  "name": "cloudflare-sandbox-mcp",
+  "version": "2.0.0",
+  "type": "module",
+  "private": true,
+  "description": "MCP server on Cloudflare Workers that executes commands in ephemeral edge sandboxes",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "^0.12.5",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "agents": "^0.20.1",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.123.0"
+  },
+  "license": "MIT"
+}
